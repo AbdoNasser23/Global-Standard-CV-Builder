@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Standard ATS CV Builder</title>
+
+    <!-- Tailwind CSS for UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js for Dynamic Reactive Form -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- html2pdf.js for Client-Side PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        /* Global ATS-Friendly Standard Font */
+        body {
+            font-family: 'Arial', sans-serif;
+        }
+
+        /* Strict Single A4 Page Dimensions to Prevent Blank Pages */
+        .cv-page {
+            width: 210mm;
+            height: 296mm;
+            /* 296mm avoids forced page-break overflow */
+            box-sizing: border-box;
+            background: #ffffff;
+            color: #111827;
+            overflow: hidden;
+            /* Clips any sub-pixel rendering spill */
+        }
+    </style>
+</head>
+
+<body class="bg-slate-100 text-slate-800 antialiased" x-data="cvApp()">
+
+    <!-- Header Banner -->
+    <header class="bg-slate-900 text-white py-4 px-6 shadow-md flex justify-between items-center print:hidden">
+        <div>
+            <h1 class="text-xl font-bold tracking-wide">ATS Resume Builder</h1>
+            <p class="text-xs text-slate-400">Pure JavaScript - Auto Save & Projects Section Enabled</p>
+        </div>
+        <div class="flex gap-3">
+            <button @click="resetForm()"
+                class="bg-slate-700 hover:bg-slate-600 text-xs text-white py-2 px-3 rounded transition-all">
+                Reset Form
+            </button>
+            <button @click="generatePDF()"
+                class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-6 rounded shadow transition-all flex items-center gap-2 text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                Download PDF
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <main class="max-w-[1700px] mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+        <!-- Left Column: Input Form (5 Cols) -->
+        <section
+            class="lg:col-span-5 bg-white p-6 rounded-lg shadow-sm border border-slate-200 space-y-6 h-fit max-h-[calc(100vh-100px)] overflow-y-auto">
+
+            <!-- Personal Info -->
+            <div>
+                <h2 class="text-lg font-bold border-b pb-2 mb-4 text-slate-700">1. Personal Details</h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Full Name</label>
+                        <input type="text" x-model="cv.fullName" @input="saveToStorage()"
+                            class="w-full text-sm p-2 border rounded border-slate-300 focus:ring-1 focus:ring-slate-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Job Title</label>
+                        <input type="text" x-model="cv.jobTitle" @input="saveToStorage()"
+                            class="w-full text-sm p-2 border rounded border-slate-300 focus:ring-1 focus:ring-slate-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Email</label>
+                        <input type="email" x-model="cv.email" @input="saveToStorage()"
+                            class="w-full text-sm p-2 border rounded border-slate-300 focus:ring-1 focus:ring-slate-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Phone</label>
+                        <input type="text" x-model="cv.phone" @input="saveToStorage()"
+                            class="w-full text-sm p-2 border rounded border-slate-300 focus:ring-1 focus:ring-slate-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Location</label>
+                        <input type="text" x-model="cv.location" @input="saveToStorage()"
+                            class="w-full text-sm p-2 border rounded border-slate-300 focus:ring-1 focus:ring-slate-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">LinkedIn / Portfolio URL</label>
+                        <input type="text" x-model="cv.link" @input="saveToStorage()"
+                            class="w-full text-sm p-2 border rounded border-slate-300 focus:ring-1 focus:ring-slate-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Professional Summary -->
+            <div>
+                <h2 class="text-lg font-bold border-b pb-2 mb-4 text-slate-700">2. Professional Summary</h2>
+                <textarea x-model="cv.summary" @input="saveToStorage()" rows="3"
+                    class="w-full text-sm p-2 border rounded border-slate-300 focus:ring-1 focus:ring-slate-500"></textarea>
+            </div>
+
+            <!-- Work Experience -->
+            <div>
+                <div class="flex justify-between items-center border-b pb-2 mb-4">
+                    <h2 class="text-lg font-bold text-slate-700">3. Work History</h2>
+                    <button @click="addExperience()"
+                        class="text-xs bg-slate-800 text-white px-2.5 py-1 rounded hover:bg-slate-700">+ Add
+                        Job</button>
+                </div>
+
+                <template x-for="(exp, index) in cv.experiences" :key="index">
+                    <div class="p-3 border rounded border-slate-200 mb-3 bg-slate-50 relative space-y-2">
+                        <button @click="removeExperience(index)"
+                            class="absolute top-2 right-2 text-red-500 hover:text-red-700 text-xs font-bold">Remove</button>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="text" placeholder="Job Title" x-model="exp.role" @input="saveToStorage()"
+                                class="text-xs p-2 border rounded bg-white">
+                            <input type="text" placeholder="Company Name" x-model="exp.company" @input="saveToStorage()"
+                                class="text-xs p-2 border rounded bg-white">
+                            <input type="text" placeholder="Dates (e.g. Jan 2022 - Present)" x-model="exp.period"
+                                @input="saveToStorage()" class="text-xs p-2 border rounded bg-white col-span-2">
+                        </div>
+                        <textarea placeholder="Key Responsibilities..." x-model="exp.details" @input="saveToStorage()"
+                            rows="2" class="w-full text-xs p-2 border rounded bg-white"></textarea>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Projects Section Form -->
+            <div>
+                <div class="flex justify-between items-center border-b pb-2 mb-4">
+                    <h2 class="text-lg font-bold text-slate-700">4. Key Projects</h2>
+                    <button @click="addProject()"
+                        class="text-xs bg-slate-800 text-white px-2.5 py-1 rounded hover:bg-slate-700">+ Add
+                        Project</button>
+                </div>
+
+                <template x-for="(proj, index) in cv.projects" :key="index">
+                    <div class="p-3 border rounded border-slate-200 mb-3 bg-slate-50 relative space-y-2">
+                        <button @click="removeProject(index)"
+                            class="absolute top-2 right-2 text-red-500 hover:text-red-700 text-xs font-bold">Remove</button>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="text" placeholder="Project Name" x-model="proj.title" @input="saveToStorage()"
+                                class="text-xs p-2 border rounded bg-white">
+                            <input type="text" placeholder="Link (e.g. github.com/user/repo)" x-model="proj.link"
+                                @input="saveToStorage()" class="text-xs p-2 border rounded bg-white">
+                            <input type="text" placeholder="Tech Stack (e.g. Laravel, MySQL, REST API)"
+                                x-model="proj.technologies" @input="saveToStorage()"
+                                class="text-xs p-2 border rounded bg-white col-span-2">
+                        </div>
+                        <textarea placeholder="Key features, achievements or role..." x-model="proj.details"
+                            @input="saveToStorage()" rows="2"
+                            class="w-full text-xs p-2 border rounded bg-white"></textarea>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Education -->
+            <div>
+                <div class="flex justify-between items-center border-b pb-2 mb-4">
+                    <h2 class="text-lg font-bold text-slate-700">5. Education</h2>
+                    <button @click="addEducation()"
+                        class="text-xs bg-slate-800 text-white px-2.5 py-1 rounded hover:bg-slate-700">+ Add
+                        Degree</button>
+                </div>
+
+                <template x-for="(edu, index) in cv.education" :key="index">
+                    <div class="p-3 border rounded border-slate-200 mb-3 bg-slate-50 relative space-y-2">
+                        <button @click="removeEducation(index)"
+                            class="absolute top-2 right-2 text-red-500 hover:text-red-700 text-xs font-bold">Remove</button>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="text" placeholder="Degree / Field of Study" x-model="edu.degree"
+                                @input="saveToStorage()" class="text-xs p-2 border rounded bg-white">
+                            <input type="text" placeholder="University / School" x-model="edu.institution"
+                                @input="saveToStorage()" class="text-xs p-2 border rounded bg-white">
+                            <input type="text" placeholder="Graduation Year" x-model="edu.year" @input="saveToStorage()"
+                                class="text-xs p-2 border rounded bg-white col-span-2">
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Skills -->
+            <div>
+                <h2 class="text-lg font-bold border-b pb-2 mb-4 text-slate-700">6. Skills</h2>
+                <input type="text" placeholder="Comma separated (e.g. PHP, Laravel, Git)" x-model="cv.skillsInput"
+                    @input="updateSkills()" class="w-full text-sm p-2 border rounded border-slate-300">
+            </div>
+
+        </section>
+
+        <!-- Right Column: Live ATS-Standard Preview (7 Cols) -->
+        <section class="lg:col-span-7 flex justify-center items-start overflow-x-auto">
+
+            <!-- Target CV Container -->
+            <div id="cv-preview"
+                class="cv-page p-8 shadow-xl border border-slate-300 font-sans text-slate-900 leading-normal">
+
+                <!-- Header Section -->
+                <div class="border-b-2 border-slate-800 pb-3 mb-4">
+                    <h1 class="text-3xl font-bold tracking-tight text-slate-900 uppercase"
+                        x-text="cv.fullName || 'JOHN DOE'"></h1>
+                    <p class="text-sm font-semibold text-slate-700 mt-1 uppercase tracking-wider"
+                        x-text="cv.jobTitle || 'SOFTWARE ENGINEER'"></p>
+
+                    <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600 mt-2">
+                        <span x-show="cv.email" x-text="cv.email"></span>
+                        <span x-show="cv.email && cv.phone">•</span>
+                        <span x-show="cv.phone" x-text="cv.phone"></span>
+                        <span x-show="cv.phone && cv.location">•</span>
+                        <span x-show="cv.location" x-text="cv.location"></span>
+                        <span x-show="cv.link">•</span>
+                        <span x-show="cv.link" x-text="cv.link" class="underline"></span>
+                    </div>
+                </div>
+
+                <!-- Summary Section -->
+                <div class="mb-4" x-show="cv.summary">
+                    <h2
+                        class="text-xs font-bold uppercase tracking-widest text-slate-900 border-b border-slate-300 pb-1 mb-1.5">
+                        Professional Summary</h2>
+                    <p class="text-xs text-slate-800 leading-relaxed whitespace-pre-line" x-text="cv.summary"></p>
+                </div>
+
+                <!-- Experience Section -->
+                <div class="mb-4" x-show="cv.experiences.length > 0">
+                    <h2
+                        class="text-xs font-bold uppercase tracking-widest text-slate-900 border-b border-slate-300 pb-1 mb-2">
+                        Work Experience</h2>
+
+                    <template x-for="exp in cv.experiences" :key="exp">
+                        <div class="mb-2.5">
+                            <div class="flex justify-between items-baseline">
+                                <span class="text-xs font-bold text-slate-900" x-text="exp.role || 'Job Title'"></span>
+                                <span class="text-[11px] font-medium text-slate-600"
+                                    x-text="exp.period || 'Dates'"></span>
+                            </div>
+                            <div class="text-xs font-semibold text-slate-700 italic mb-0.5"
+                                x-text="exp.company || 'Company Name'"></div>
+                            <p class="text-xs text-slate-800 leading-relaxed whitespace-pre-line" x-text="exp.details">
+                            </p>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Projects Preview Section -->
+                <div class="mb-4" x-show="cv.projects && cv.projects.length > 0">
+                    <h2
+                        class="text-xs font-bold uppercase tracking-widest text-slate-900 border-b border-slate-300 pb-1 mb-2">
+                        Key Projects</h2>
+
+                    <template x-for="proj in cv.projects" :key="proj">
+                        <div class="mb-2.5">
+                            <div class="flex justify-between items-baseline">
+                                <div>
+                                    <span class="text-xs font-bold text-slate-900"
+                                        x-text="proj.title || 'Project Name'"></span>
+                                    <span x-show="proj.technologies" class="text-[11px] text-slate-600 font-medium"
+                                        x-text="' | ' + proj.technologies"></span>
+                                </div>
+                                <span x-show="proj.link" class="text-[11px] text-slate-600 underline"
+                                    x-text="proj.link"></span>
+                            </div>
+                            <p class="text-xs text-slate-800 leading-relaxed whitespace-pre-line mt-0.5"
+                                x-text="proj.details"></p>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Education Section -->
+                <div class="mb-4" x-show="cv.education.length > 0">
+                    <h2
+                        class="text-xs font-bold uppercase tracking-widest text-slate-900 border-b border-slate-300 pb-1 mb-2">
+                        Education</h2>
+
+                    <template x-for="edu in cv.education" :key="edu">
+                        <div class="mb-1.5 flex justify-between items-baseline">
+                            <div>
+                                <span class="text-xs font-bold text-slate-900"
+                                    x-text="edu.degree || 'Degree Title'"></span>
+                                <span class="text-xs text-slate-700"> - </span>
+                                <span class="text-xs italic text-slate-700"
+                                    x-text="edu.institution || 'University'"></span>
+                            </div>
+                            <span class="text-[11px] font-medium text-slate-600" x-text="edu.year || 'Year'"></span>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Skills Section -->
+                <div class="mb-4" x-show="cv.skillsList.length > 0">
+                    <h2
+                        class="text-xs font-bold uppercase tracking-widest text-slate-900 border-b border-slate-300 pb-1 mb-1.5">
+                        Technical & Professional Skills</h2>
+                    <p class="text-xs text-slate-800 leading-relaxed" x-text="cv.skillsList.join(' • ')"></p>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Alpine.js Application Logic -->
+    <script>
+        function cvApp() {
+            const defaultState = {
+                fullName: 'John Doe',
+                jobTitle: 'Backend Laravel Developer',
+                email: 'john.doe@example.com',
+                phone: '+1 234 567 890',
+                location: 'Cairo, Egypt',
+                link: 'linkedin.com/in/johndoe',
+                summary: 'Results-driven Backend Developer with experience constructing scalable web applications, RESTful APIs, and optimizing database performance.',
+                experiences: [
+                    {
+                        role: 'Backend Developer',
+                        company: 'Tech Solutions Inc.',
+                        period: 'Jan 2023 - Present',
+                        details: '• Designed and maintained robust RESTful APIs.\n• Optimized database queries resulting in performance improvement.\n• Integrated third-party payment gateways and webhooks.'
+                    }
+                ],
+                projects: [
+                    {
+                        title: 'E-Commerce RESTful API',
+                        link: 'github.com/example/ecommerce-api',
+                        technologies: 'Laravel 11, MySQL, JWT, Redis',
+                        details: '• Built a high-performance backend API with JWT authentication and RBAC authorization.\n• Integrated payment gateway and optimized response times using Redis caching.'
+                    }
+                ],
+                education: [
+                    {
+                        degree: 'B.Sc. in Computer Science',
+                        institution: 'Cairo University',
+                        year: '2022'
+                    }
+                ],
+                skillsInput: 'PHP, Laravel, MySQL, RESTful APIs, Git, Docker, Alpine.js, Tailwind CSS',
+                skillsList: ['PHP', 'Laravel', 'MySQL', 'RESTful APIs', 'Git', 'Docker', 'Alpine.js', 'Tailwind CSS']
+            };
+
+            return {
+                cv: defaultState,
+
+                init() {
+                    const savedData = localStorage.getItem('user_cv_data');
+                    if (savedData) {
+                        try {
+                            this.cv = JSON.parse(savedData);
+                        } catch (e) {
+                            console.error('Error loading saved data');
+                        }
+                    }
+                },
+
+                saveToStorage() {
+                    localStorage.setItem('user_cv_data', JSON.stringify(this.cv));
+                },
+
+                resetForm() {
+                    if (confirm('Are you sure you want to reset all data?')) {
+                        localStorage.removeItem('user_cv_data');
+                        this.cv = JSON.parse(JSON.stringify(defaultState));
+                    }
+                },
+
+                addExperience() {
+                    this.cv.experiences.push({ role: '', company: '', period: '', details: '' });
+                    this.saveToStorage();
+                },
+                removeExperience(index) {
+                    this.cv.experiences.splice(index, 1);
+                    this.saveToStorage();
+                },
+
+                addProject() {
+                    if (!this.cv.projects) this.cv.projects = [];
+                    this.cv.projects.push({ title: '', link: '', technologies: '', details: '' });
+                    this.saveToStorage();
+                },
+                removeProject(index) {
+                    this.cv.projects.splice(index, 1);
+                    this.saveToStorage();
+                },
+
+                addEducation() {
+                    this.cv.education.push({ degree: '', institution: '', year: '' });
+                    this.saveToStorage();
+                },
+                removeEducation(index) {
+                    this.cv.education.splice(index, 1);
+                    this.saveToStorage();
+                },
+
+                updateSkills() {
+                    this.cv.skillsList = this.cv.skillsInput
+                        .split(',')
+                        .map(s => s.trim())
+                        .filter(s => s.length > 0);
+                    this.saveToStorage();
+                },
+
+                generatePDF() {
+                    const element = document.getElementById('cv-preview');
+                    const fileName = this.cv.fullName.trim() ? this.cv.fullName.replace(/\s+/g, '_') : 'Resume';
+
+                    const opt = {
+                        margin: 0,
+                        filename: `${fileName}_Resume.pdf`,
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: {
+                            scale: 2,
+                            useCORS: true,
+                            scrollY: 0,
+                            windowWidth: element.scrollWidth
+                        },
+                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                        pagebreak: { mode: 'avoid-all' }
+                    };
+
+                    html2pdf().set(opt).from(element).save();
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
